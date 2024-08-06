@@ -17,6 +17,7 @@ class Loader(yaml.SafeLoader):
 
         super().__init__(stream)
 
+
 def construct_include(loader, node: yaml.Node):
     """Include file referenced at node."""
 
