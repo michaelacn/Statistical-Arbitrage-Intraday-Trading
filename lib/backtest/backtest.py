@@ -57,7 +57,7 @@ class PairTradingIntraday(bt.Strategy):
         self.upper_threshold = self.p.spread_mean + self.p.spread_std * self.p.entry_factor
         self.lower_threshold = self.p.spread_mean - self.p.spread_std * self.p.entry_factor
         # Trackers
-        self.position_opened = False  # Track if a position is opened
+        self.position_opened = False
         self.count = 0
         # Stop loss
         self.sl_upper = self.p.spread_mean + self.p.spread_std * 3 * self.p.entry_factor
