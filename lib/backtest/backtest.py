@@ -3,6 +3,31 @@ import backtrader as bt
 import numpy as np
 import pandas as pd
 
+from typing import Tuple
+
+
+### Engine ###
+
+
+def run_bt(hlocv_data: pd.DataFrame, params: dict, symbols: Tuple[str, str], strategy: bt.Strategy, cash: float, comm_pct: float, analyzers_config: dict) -> bt.Strategy:
+    """
+    Executes a backtesting simulation using the Backtrader framework.
+    """
+    engine = bt.Cerebro()
+
+    for symbol in symbols:
+        engine.adddata(get_data_feeds(hlocv_data, symbol), name=symbol)
+
+    engine.addstrategy(strategy, **params)
+    engine.broker.setcash(cash)
+    engine.broker.setcommission(commission=comm_pct)
+
+    for analyzer, analyzer_params in analyzers_config.items():
+        engine.addanalyzer(analyzer, **analyzer_params)
+
+    results = engine.run()
+    return results[0]
+
 
 ### DataFeeds ###
 
@@ -19,6 +44,15 @@ class CustomFeeds(bt.feeds.PandasData):
         ('volume', 'volume'),
         ('openinterest', None)
     )
+
+
+def get_data_feeds(hlocv_data: pd.DataFrame, symbol: str) -> CustomFeeds:
+    """
+    Filters HLOCV data for a specific symbol and prepares it for Backtrader.
+    """
+    hlocv_asset = hlocv_data[hlocv_data['ticker'].str.contains(symbol)]
+    hlocv_asset.index = pd.to_datetime(hlocv_asset.index)
+    return CustomFeeds(dataname=hlocv_asset)
 
 
 ### Strategy ###
@@ -137,3 +171,14 @@ class OrdersAnalyzer(bt.Analyzer):
 
     def get_analysis(self):
         return self.rets['orders']
+    
+
+def get_analyzers_results(strat: bt.Strategy) -> dict:
+    """
+    Extracts results from all analyzers attached to a strategy object.
+    """
+    results = {}
+    for name, analyzer in strat.analyzers.getitems():
+        results[name] = analyzer.get_analysis()
+
+    return results
