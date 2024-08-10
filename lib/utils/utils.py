@@ -1,7 +1,7 @@
 import os 
-from easydict import EasyDict as edict
 import yaml
-import json 
+import json
+from easydict import EasyDict as edict
 
 
 class Loader(yaml.SafeLoader):

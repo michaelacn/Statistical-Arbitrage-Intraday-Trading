@@ -60,7 +60,7 @@ def count_vecm_params(vecm_model: VECM) -> int:
 
 def likelihood_ratio_test(model_restricted: VECM, model_unrestricted: VECM) -> float:
     """
-    Performs a likelihood ratio test to compare two nested VECM..
+    Performs a likelihood ratio test to compare two nested VECM.
     """
     lr_stat = -2 * (np.log(model_restricted.llf) - np.log(model_unrestricted.llf))
     df = count_vecm_params(model_unrestricted) - count_vecm_params(model_restricted)
@@ -75,11 +75,11 @@ def perform_cointegration_analysis(logprices: pd.DataFrame, optimal_lag: int) ->
     eligible_models = []
 
     # First Stage: Trace Test for Cointegration Rank
-    rank_model3 = trace_test(logprices, det_order=1, k_ar_diff=optimal_lag)
+    rank_model3 = trace_test(logprices, det_order=1, optimal_lag=optimal_lag)
     if rank_model3 > 0:
-        rank_model2 = trace_test(logprices, det_order=0, k_ar_diff=optimal_lag)
+        rank_model2 = trace_test(logprices, det_order=0, optimal_lag=optimal_lag)
         if rank_model2 > 0:
-            rank_model1 = trace_test(logprices, det_order=-1, k_ar_diff=optimal_lag)
+            rank_model1 = trace_test(logprices, det_order=-1, optimal_lag=optimal_lag)
             eligible_models.append((logprices, 3 if rank_model1 > 0 else 2))
         else:
             eligible_models.append((logprices, 1))

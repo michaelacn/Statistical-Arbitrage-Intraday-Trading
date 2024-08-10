@@ -6,7 +6,7 @@ import pandas as pd
 from typing import Tuple
 
 
-### Engine ###
+### Backtesting Engine ###
 
 
 def run_bt(hlocv_data: pd.DataFrame, params: dict, symbols: Tuple[str, str], strategy: bt.Strategy, cash: float, comm_pct: float, analyzers_config: dict) -> bt.Strategy:
@@ -92,7 +92,7 @@ class PairTradingIntraday(bt.Strategy):
         self.lower_threshold = self.p.spread_mean - self.p.spread_std * self.p.entry_factor
         # Trackers
         self.position_opened = False
-        self.count = 0
+        self.sl_triggered = False
         # Stop loss
         self.sl_upper = self.p.spread_mean + self.p.spread_std * 3 * self.p.entry_factor
         self.sl_lower = self.p.spread_mean - self.p.spread_std * 3 * self.p.entry_factor
@@ -132,18 +132,20 @@ class PairTradingIntraday(bt.Strategy):
                 self.position_opened = 'long_spread'
                 self.log(f'OPEN (Long Spread): {size1} {self.datas[1]._name}, {size0} {self.datas[0]._name}')
 
-        elif self.position_opened:  # Verify if a position is currently open
+        elif self.position_opened and not self.sl_triggered:  # Verify if a position is currently open
             mean_reverting = np.sign(self.spread_indicator.spread[0]) != np.sign(self.spread_indicator.spread[-1])
             stop_loss = self.spread_indicator.spread[0] > self.sl_upper or self.spread_indicator.spread[0] < self.sl_lower
-            if mean_reverting or stop_loss:
+            if mean_reverting:
                 self.close(data=self.datas[0], size=abs(position0))
                 self.close(data=self.datas[1], size=abs(position1))
-                self.position_opened = False if not stop_loss else 'sl_reached'
-                if stop_loss and self.count == 0:
-                    self.log(f'CLOSE (Stop Loss Reached): {position0} {self.datas[0]._name}, {position1} {self.datas[1]._name}')
-                    self.count += 1
-                elif self.count == 0:
-                    self.log(f'CLOSE (Mean Reversion): {position0} {self.datas[0]._name}, {position1} {self.datas[1]._name}')
+                self.position_opened = False
+                self.log(f'CLOSE (Mean Reversion): {position0} {self.datas[0]._name}, {position1} {self.datas[1]._name}')
+            elif stop_loss:
+                self.close(data=self.datas[0], size=abs(position0))
+                self.close(data=self.datas[1], size=abs(position1))                    
+                self.log(f'CLOSE (Stop Loss Reached): {position0} {self.datas[0]._name}, {position1} {self.datas[1]._name}')
+                self.sl_triggered = True
+                self.position_opened = 'sl_triggered'
 
 
 ### Analyzers ###
