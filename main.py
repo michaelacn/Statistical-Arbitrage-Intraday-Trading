@@ -31,6 +31,7 @@ def get_trading_config(args):
     print('######### FETCH TRADING CONFIG #########')
     print('----------------------------------------')
 
+    print(f'[INFO DATA]: Retrieving common timestamps for {args.symbols}')
     hlocv_data, prices, volumes = get_data_and_preprocess(args.csv_file, args.symbols)
     logprices = np.log(prices)
     dates = pd.Series(hlocv_data.index.date).unique()
@@ -44,7 +45,7 @@ def get_trading_config(args):
         
         data_train = current_date_logprices[:args.train_size]
         if len(data_train) < args.train_size:
-            print(f"[INFO DATA] {current_date}: Training data does not have {args.train_size} points, skipping.")
+            print(f"[INFO DATA] {current_date}: Not enough training data, skipping.")
             continue
 
         check_stationary = {col: is_stationary(data_train[col]) for col in data_train.columns}
@@ -75,7 +76,7 @@ def get_trading_config(args):
                     trading_params['entry_factor'].append(args.entry_factor)
                     trading_params['warmup_period'].append(args.warmup_period)
             
-            print(f'[INFO TRAINING] {current_date}: No cointegration relationship, skipping.')
+            print(f'[INFO MODEL] {current_date}: No cointegration relationship, skipping.')
 
     trading_config = pd.DataFrame(trading_params, index=pd.to_datetime(trading_dates))
     return trading_config, hlocv_data
@@ -91,14 +92,15 @@ def backtest_trading_config(args, trading_config: pd.DataFrame, hlocv_data: pd.D
     for analyzer_name, analyzer_params in args.analyzers_config.items():
         analyzers_config[getattr(sys.modules[__name__], analyzer_name)] = analyzer_params
 
-    orders_history = pd.DataFrame()  # Initialize an empty DataFrame to accumulate orders
+    orders_history = pd.DataFrame()
+    trades_history = pd.DataFrame()
 
     print('--------------------------------------------')
     print('######### START TRADING SIMULATION #########')
     print('--------------------------------------------')
 
     for current_date, params in trading_config.iterrows():
-        print('--------------------------------------------')
+        print(f'----------------{current_date}----------------')
         hlocv_current_date = filter_current_date(hlocv_data, current_date)
 
         # Skip if not enough trading data
@@ -114,23 +116,25 @@ def backtest_trading_config(args, trading_config: pd.DataFrame, hlocv_data: pd.D
         strat = run_bt(hlocv_current_date, updated_params, args.symbols, strategy, args.cash, args.comm_pct, analyzers_config)
         analyzers_results = get_analyzers_results(strat)
         orders = analyzers_results['orders']
+        trades = analyzers_results['trades']
 
         # Skip if no trade activity for the day
         if orders.empty:
             print(f"[INFO] {current_date}: No trade activity, skipping.")
             continue
         
-        # Accumulate the day's orders
+        # Accumulate the day's orders and trades
         orders_history = pd.concat([orders_history, orders])
+        trades_history = pd.concat([trades_history, trades])
 
-    return orders_history.reset_index(drop=True)  # Return the accumulated orders
+    return orders_history.reset_index(drop=True), trades_history.reset_index(drop=True)
 
 
 if __name__ == "__main__": 
     opts = parse_args()
     args = get_config(opts.config)
     trading_config, hlocv_data = get_trading_config(args)
-    orders_history = backtest_trading_config(args, trading_config, hlocv_data)
+    orders_history, trades_history = backtest_trading_config(args, trading_config, hlocv_data)
 
 
 
