@@ -26,7 +26,8 @@ def run_bt(hlocv_data: pd.DataFrame, params: dict, symbols: Tuple[str, str], str
         engine.addanalyzer(analyzer, **analyzer_params)
 
     results = engine.run()
-    return results[0]
+    pf_val = engine.broker.get_value()
+    return results[0], pf_val
 
 
 ### DataFeeds ###
@@ -82,6 +83,7 @@ class PairTradingIntraday(bt.Strategy):
         beta=None,
         const=None,
         entry_factor=None,  # Multiplier for std_dev to set the entry threshold
+        sl_factor=None,
         warmup_period=None,
     )
 
@@ -94,13 +96,28 @@ class PairTradingIntraday(bt.Strategy):
         self.position_opened = False
         self.sl_triggered = False
         # Stop loss
-        self.sl_upper = self.p.spread_mean + self.p.spread_std * 3 * self.p.entry_factor
-        self.sl_lower = self.p.spread_mean - self.p.spread_std * 3 * self.p.entry_factor
+        self.sl_upper = self.p.spread_mean + self.p.spread_std * self.p.sl_factor * self.p.entry_factor
+        self.sl_lower = self.p.spread_mean - self.p.spread_std * self.p.sl_factor * self.p.entry_factor
 
-    def log(self, txt, dt=None):
-        """ Logging function for this strategy"""
-        dt = dt or self.datas[0].datetime.datetime(0)
-        print(f'[INFO ORDER] {dt.isoformat()} {txt}')
+
+    def log(self, txt, dt=None, log_type='ORDER'):
+        if isinstance(dt, str):
+            print(f'[INFO {log_type.upper()}] {dt} {txt}')
+        else:
+            dt = dt or self.datas[0].datetime.datetime(0)
+            formatted_time = dt.strftime('%H:%M:%S')
+            print(f'[INFO {log_type.upper()}] {formatted_time} {txt}')
+
+    
+    def notify_trade(self, trade):
+        if trade.isclosed:
+            entry_time = bt.num2date(trade.dtopen).strftime('%H:%M:%S')
+            exit_time = bt.num2date(trade.dtclose).strftime('%H:%M:%S')
+            symbol = trade.data._name
+            self.log(f'CLOSED: {symbol} | Entry: {entry_time}, Exit: {exit_time} | '
+                    f'Gross: {trade.pnl:.2f}, Net: {trade.pnlcomm:.2f} | '
+                    f'Commission: {trade.commission:.2f}', log_type='TRADE')
+
 
     def compute_sizes(self):
         beta = abs(self.p.beta)
@@ -120,17 +137,17 @@ class PairTradingIntraday(bt.Strategy):
         position1 = self.getposition(self.datas[1]).size
 
         if not self.position_opened:  # Ensure only one position is open at a time
-            if self.spread_indicator.spread[0] > self.upper_threshold and self.spread_indicator.spread[-1] > self.upper_threshold:
+            if all(self.spread_indicator.spread[i] > self.upper_threshold for i in range(0, 1)):
                 self.sell(data=self.datas[0], size=size0)
                 self.buy(data=self.datas[1], size=size1)
                 self.position_opened = 'short_spread'
-                self.log(f'OPEN (Short Spread): {size0} {self.datas[0]._name}, {size1} {self.datas[1]._name}')
+                self.log(f'SHORT SPREAD: Sell {self.datas[0]._name} ({-size0}) | Buy {self.datas[1]._name} ({size1})', log_type='SIGNAL')
 
-            elif self.spread_indicator.spread[0] < self.lower_threshold and self.spread_indicator.spread[-1] < self.lower_threshold:
+            elif all(self.spread_indicator.spread[i] < self.lower_threshold for i in range(0, 1)):
                 self.sell(data=self.datas[1], size=size1)
                 self.buy(data=self.datas[0], size=size0)
                 self.position_opened = 'long_spread'
-                self.log(f'OPEN (Long Spread): {size1} {self.datas[1]._name}, {size0} {self.datas[0]._name}')
+                self.log(f'LONG SPREAD: Sell {self.datas[1]._name} ({-size1}) | Buy {self.datas[0]._name} ({size0})', log_type='SIGNAL')
 
         elif self.position_opened and not self.sl_triggered:  # Verify if a position is currently open
             mean_reverting = np.sign(self.spread_indicator.spread[0]) != np.sign(self.spread_indicator.spread[-1])
@@ -139,13 +156,22 @@ class PairTradingIntraday(bt.Strategy):
                 self.close(data=self.datas[0], size=abs(position0))
                 self.close(data=self.datas[1], size=abs(position1))
                 self.position_opened = False
-                self.log(f'CLOSE (Mean Reversion): {position0} {self.datas[0]._name}, {position1} {self.datas[1]._name}')
+                self.log(f'MEAN REVERSION: Close Position {self.datas[0]._name} ({-position0}) | Close Position {self.datas[1]._name} ({-position1})', log_type='SIGNAL')
             elif stop_loss:
                 self.close(data=self.datas[0], size=abs(position0))
                 self.close(data=self.datas[1], size=abs(position1))                    
-                self.log(f'CLOSE (Stop Loss Reached): {position0} {self.datas[0]._name}, {position1} {self.datas[1]._name}')
+                self.log(f'STOP LOSS: Close Position {self.datas[0]._name} ({-position0}) | Close Position {self.datas[1]._name} ({-position1})', log_type='SIGNAL')
                 self.sl_triggered = True
                 self.position_opened = 'sl_triggered'
+
+    def stop(self):
+        for data in self.datas:
+            position = self.getposition(data).size
+            if position != 0:  # If there's an open position
+                self.close(data=data)  # Force close the position
+                symbol = data._name
+                self.log(f'FORCED CLOSE (End of Day): {symbol} | Size: {position}', log_type='TRADE')
+
 
 
 ### Analyzers ###
@@ -173,6 +199,38 @@ class OrdersAnalyzer(bt.Analyzer):
 
     def get_analysis(self):
         return self.rets['orders']
+    
+
+class TradesAnalyzer(bt.Analyzer):
+    def start(self):
+        self.trade_sizes = {}
+        self.trades = []
+
+    def notify_trade(self, trade):
+        if trade.isopen:
+            self.trade_sizes[trade.ref] = trade.size
+        elif trade.isclosed:
+            entry_time = bt.num2date(trade.dtopen)
+            exit_time = bt.num2date(trade.dtclose)
+            symbol = trade.data._name
+            self.trades.append({
+                'symbol': symbol,
+                'entry_date': entry_time,
+                'exit_date': exit_time,
+                'size': self.trade_sizes.get(trade.ref),
+                'entry_price': trade.price,
+                'exit_price': trade.data.close[0],
+                'pnl_gross': trade.pnl,
+                'pnl_net': trade.pnlcomm,
+                'comm': trade.commission
+            })
+
+    def stop(self):
+        trades = pd.DataFrame(self.trades)
+        self.rets['trades'] = trades
+
+    def get_analysis(self):
+        return self.rets['trades']
     
 
 def get_analyzers_results(strat: bt.Strategy) -> dict:
