@@ -3,6 +3,10 @@ import backtrader as bt
 import numpy as np
 import pandas as pd
 
+import matplotlib.pyplot as plt
+import seaborn as sns
+sns.set_style('darkgrid')
+
 from typing import Tuple
 
 
@@ -243,3 +247,94 @@ def get_analyzers_results(strat: bt.Strategy) -> dict:
         results[name] = analyzer.get_analysis()
 
     return results
+
+
+### Performances ###
+
+
+def get_returns(args, pnl_history: pd.Series) -> pd.Series:
+    """
+    Generates a series of returns indexed by daily datetime, calculated from the P&L history.
+    """ 
+    pnl_history.index = pd.to_datetime(pnl_history.index)
+    date_range = pd.date_range(start=pnl_history.index.min(), end=pnl_history.index.max(), freq=args.freq)
+    
+    returns_history = pd.Series(0, index=date_range)
+    portfolio_value = pnl_history.cumsum() + args.cash
+    returns_strategy = portfolio_value.pct_change().dropna()
+
+    for date, ret in returns_strategy.items():
+        if date in returns_history.index:
+            returns_history.at[date] = ret
+    
+    return returns_history
+
+
+def analyze_returns(args, pnl_history: pd.Series) -> dict:
+    """
+    Analyzes a series of returns and generates statistics and plots.
+    """
+    returns = get_returns(args, pnl_history)
+    print('--------------------------------------------')
+    print('######### ANALYZE PERFORMANCES #########')
+    print('--------------------------------------------')
+
+    start_period = returns.index.min().strftime('%Y-%m-%d')
+    end_period = returns.index.max().strftime('%Y-%m-%d')
+    cumulative_return = (1 + returns).cumprod()[-1] - 1
+
+    n_years = (returns.index.max() - returns.index.min()).days / 365.25
+    cagr = (1 + cumulative_return) ** (1 / n_years) - 1
+
+    # Determine annualization factor based on frequency
+    freq_factors = {
+        'T': 252 * 6.5 * 60,  # 252 trading days, 6.5 hours per day, 60 minutes per hour
+        'H': 252 * 6.5,       # 252 trading days, 6.5 hours per day
+        'B': 252,             # 252 trading days
+        'W': 52,              # 52 weeks
+        'M': 12               # 12 months
+    }
+    annualization_factor = freq_factors.get(args.freq.upper())
+    sharpe_ratio = returns.mean() / returns.std() * np.sqrt(annualization_factor)
+
+    cumulative = (1 + returns).cumprod()
+    peak = cumulative.cummax()
+    drawdown = (cumulative - peak) / peak
+    max_drawdown = drawdown.min()
+
+    positive_returns = returns[returns > 0].count()
+    negative_returns = returns[returns < 0].count()
+    hit_ratio = positive_returns / (positive_returns + negative_returns)
+    
+    stats = {
+        "Start Period": start_period,
+        "End Period": end_period,
+        "Cumulative Return": f"{cumulative_return:.2%}",
+        "CAGR﹪": f"{cagr:.2%}",
+        "Sharpe": f"{sharpe_ratio:.2f}",
+        "Max Drawdown": f"{max_drawdown:.2%}",
+        "Hit Ratio": f"{hit_ratio:.2%}",
+        "Total P&L": f"{pnl_history.sum():.2f}",
+    }
+
+    for k, v in stats.items():
+        print(f"{k:<20} {v}")
+
+    fig, axs = plt.subplots(3, 1, figsize=(18, 12))
+    fig.suptitle('Strategy Performances', fontsize=14)
+
+    cumulative_returns = (1 + returns).cumprod()
+    axs[0].plot(cumulative_returns)
+    axs[0].set_title('Cumulative Returns')
+
+    axs[1].fill_between(drawdown.index, drawdown, 0, color='red', alpha=0.5)
+    axs[1].set_title('Drawdowns')
+
+    axs[2].axhline(0, color='black', linewidth=0.5, linestyle='--')
+    significant_returns = returns[returns != 0]
+    axs[2].bar(significant_returns.index, significant_returns, width=0.5, color='yellow')
+    axs[2].set_title('Daily Returns')
+
+    plt.tight_layout()
+    plt.show()
+
