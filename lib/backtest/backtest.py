@@ -82,7 +82,7 @@ class PairTradingIntraday(bt.Strategy):
         spread_mean=None,
         beta=None,
         const=None,
-        entry_factor=None,  # Multiplier for std_dev to set the entry threshold
+        entry_factor=None,
         sl_factor=None,
         warmup_period=None,
     )
@@ -96,8 +96,8 @@ class PairTradingIntraday(bt.Strategy):
         self.position_opened = False
         self.sl_triggered = False
         # Stop loss
-        self.sl_upper = self.p.spread_mean + self.p.spread_std * self.p.sl_factor * self.p.entry_factor
-        self.sl_lower = self.p.spread_mean - self.p.spread_std * self.p.sl_factor * self.p.entry_factor
+        self.sl_upper = self.p.spread_mean + self.p.spread_std * self.p.sl_factor
+        self.sl_lower = self.p.spread_mean - self.p.spread_std * self.p.sl_factor
 
 
     def log(self, txt, dt=None, log_type='ORDER'):
@@ -127,6 +127,7 @@ class PairTradingIntraday(bt.Strategy):
         size1 = int(pf_val1 / self.datas[1].close[0])
         return size0, size1
 
+
     def next(self):
         # Skip trading during the warmup period
         if len(self) < self.p.warmup_period:
@@ -149,7 +150,7 @@ class PairTradingIntraday(bt.Strategy):
                 self.position_opened = 'long_spread'
                 self.log(f'LONG SPREAD: Sell {self.datas[1]._name} ({-size1}) | Buy {self.datas[0]._name} ({size0})', log_type='SIGNAL')
 
-        elif self.position_opened and not self.sl_triggered:  # Verify if a position is currently open
+        elif self.position_opened and not self.sl_triggered:
             mean_reverting = np.sign(self.spread_indicator.spread[0]) != np.sign(self.spread_indicator.spread[-1])
             stop_loss = self.spread_indicator.spread[0] > self.sl_upper or self.spread_indicator.spread[0] < self.sl_lower
             if mean_reverting:
@@ -167,7 +168,7 @@ class PairTradingIntraday(bt.Strategy):
     def stop(self):
         for data in self.datas:
             position = self.getposition(data).size
-            if position != 0:  # If there's an open position
+            if position != 0:
                 self.close(data=data)  # Force close the position
                 symbol = data._name
                 self.log(f'FORCED CLOSE (End of Day): {symbol} | Size: {position}', log_type='TRADE')

@@ -20,11 +20,11 @@ def get_common_timestamps(data: pd.DataFrame, symbols: Tuple[str, str]) -> pd.Da
 
 def filter_current_date(data: pd.DataFrame, current_date: str) -> pd.DataFrame:
     """
-    Filters dataset between 0:00 AM and 12:00 PM UTC on the specified date.
+    Filters dataset between 10:00 AM and 19:00 PM UTC on the specified date.
     """
     data.index = pd.to_datetime(data.index)
-    start_datetime = pd.to_datetime(current_date).tz_localize('UTC') + pd.Timedelta(hours=0, minutes=0)
-    end_datetime = pd.to_datetime(current_date).tz_localize('UTC') + pd.Timedelta(hours=23, minutes=0)
+    start_datetime = pd.to_datetime(current_date).tz_localize('UTC') + pd.Timedelta(hours=10, minutes=0)
+    end_datetime = pd.to_datetime(current_date).tz_localize('UTC') + pd.Timedelta(hours=19, minutes=0)
     return data[(data.index >= start_datetime) & (data.index <= end_datetime)]
 
 
