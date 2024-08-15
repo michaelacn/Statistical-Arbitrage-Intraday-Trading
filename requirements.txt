@@ -1,0 +1,9 @@
+numpy==1.26.4
+pandas==2.2.1
+seaborn==0.13.2
+statsmodels==0.14.1
+scipy==1.13.0
+backtrader==1.9.78.123
+dash==2.17.1
+easydict==1.13
+yaml
