@@ -154,4 +154,4 @@ def run_dash_app(args, trades_history, pnl_history, returns, stats, hlocv_data):
         return pnl_fig, cumulative_fig, drawdown_fig
 
     # Run the Dash server
-    app.run_server(debug=False)
+    app.run_server(host='0.0.0.0', debug=False)
