@@ -3,10 +3,6 @@ import backtrader as bt
 import numpy as np
 import pandas as pd
 
-import matplotlib.pyplot as plt
-import seaborn as sns
-sns.set_style('darkgrid')
-
 from typing import Tuple
 
 
@@ -178,7 +174,6 @@ class PairTradingIntraday(bt.Strategy):
                 self.log(f'FORCED CLOSE (End of Day): {symbol} | Size: {position}', log_type='TRADE')
 
 
-
 ### Analyzers ###
 
 
@@ -204,20 +199,29 @@ class OrdersAnalyzer(bt.Analyzer):
 
     def get_analysis(self):
         return self.rets['orders']
-    
+
 
 class TradesAnalyzer(bt.Analyzer):
     def start(self):
         self.trade_sizes = {}
         self.trades = []
+        self.last_open_trades = {}  # Dictionary to store the last open trades by symbol
 
     def notify_trade(self, trade):
         if trade.isopen:
             self.trade_sizes[trade.ref] = trade.size
+            self.last_open_trades[trade.data._name] = {
+                'symbol': trade.data._name,
+                'entry_date': bt.num2date(trade.dtopen),
+                'size': trade.size,
+                'entry_price': trade.price,
+                'entry_comm': trade.commission  # Store the entry commission
+            }
         elif trade.isclosed:
             entry_time = bt.num2date(trade.dtopen)
             exit_time = bt.num2date(trade.dtclose)
             symbol = trade.data._name
+
             self.trades.append({
                 'symbol': symbol,
                 'entry_date': entry_time,
@@ -229,14 +233,41 @@ class TradesAnalyzer(bt.Analyzer):
                 'pnl_net': trade.pnlcomm,
                 'comm': trade.commission
             })
+            self.last_open_trades.pop(symbol, None)  # Remove the trade from the open trades
 
     def stop(self):
+        for symbol, trade in self.last_open_trades.items():  # Iterate over remaining open trades
+            entry_time = trade['entry_date']
+            size = trade['size']
+            entry_price = trade['entry_price']
+            entry_comm = trade['entry_comm']
+            exit_time = self.strategy.datetime.datetime(0)  # Use the last available datetime
+            last_price = self.strategy.getdatabyname(symbol).close[0]  # Get the last closing price
+
+            pnl_gross = size * (last_price - entry_price)  # Calculate gross PnL
+            exit_comm = entry_comm  # Assume exit commission is equal to entry commission
+            total_comm = entry_comm + exit_comm  # Total commission
+            pnl_net = pnl_gross - total_comm  # Calculate net PnL
+
+            # Append the forced close trade details
+            self.trades.append({
+                'symbol': symbol,
+                'entry_date': entry_time,
+                'exit_date': exit_time,
+                'size': size,
+                'entry_price': entry_price,
+                'exit_price': last_price,
+                'pnl_gross': pnl_gross,
+                'pnl_net': pnl_net,  # Net PnL after commission
+                'comm': total_comm  # Total commission
+            })
+
         trades = pd.DataFrame(self.trades)
         self.rets['trades'] = trades
 
     def get_analysis(self):
         return self.rets['trades']
-    
+
 
 def get_analyzers_results(strat: bt.Strategy) -> dict:
     """
@@ -270,20 +301,17 @@ def get_returns(args, pnl_history: pd.Series) -> pd.Series:
     return returns_history
 
 
-def analyze_returns(args, pnl_history: pd.Series) -> dict:
+def analyze_strategy(args, pnl_history: pd.Series) -> dict:
     """
-    Analyzes a series of returns and generates statistics and plots.
+    Generates performance statistics and returns history.
     """
     returns = get_returns(args, pnl_history)
-    print('--------------------------------------------')
-    print('######### ANALYZE PERFORMANCES #########')
-    print('--------------------------------------------')
-
+ 
     start_period = returns.index.min().strftime('%Y-%m-%d')
     end_period = returns.index.max().strftime('%Y-%m-%d')
     cumulative_return = (1 + returns).cumprod()[-1] - 1
 
-    n_years = (returns.index.max() - returns.index.min()).days / 365.25
+    n_years = (returns.index.max() - returns.index.min()).days / 252
     cagr = (1 + cumulative_return) ** (1 / n_years) - 1
 
     # Determine annualization factor based on frequency
@@ -317,24 +345,5 @@ def analyze_returns(args, pnl_history: pd.Series) -> dict:
         "Total P&L": f"{pnl_history.sum():.2f}",
     }
 
-    for k, v in stats.items():
-        print(f"{k:<20} {v}")
-
-    fig, axs = plt.subplots(3, 1, figsize=(18, 12))
-    fig.suptitle('Strategy Performances', fontsize=14)
-
-    cumulative_returns = (1 + returns).cumprod()
-    axs[0].plot(cumulative_returns)
-    axs[0].set_title('Cumulative Returns')
-
-    axs[1].fill_between(drawdown.index, drawdown, 0, color='red', alpha=0.5)
-    axs[1].set_title('Drawdowns')
-
-    axs[2].axhline(0, color='black', linewidth=0.5, linestyle='--')
-    significant_returns = returns[returns != 0]
-    axs[2].bar(significant_returns.index, significant_returns, width=0.5, color='yellow')
-    axs[2].set_title('Daily Returns')
-
-    plt.tight_layout()
-    plt.show()
+    return stats, returns
 

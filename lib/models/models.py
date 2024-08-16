@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 
 import scipy
+from scipy.stats import jarque_bera
 
 from statsmodels.tsa.vector_ar.vecm import coint_johansen
 from statsmodels.tsa.stattools import adfuller
@@ -11,7 +12,7 @@ from statsmodels.tsa.vector_ar.vecm import VECM
 from typing import Tuple
 
 
-def is_stationary(timeseries: pd.Series, alpha: float = 0.05) -> bool:
+def is_stationary(timeseries: pd.Series, alpha: float = 0.10) -> bool:
     """
     Perform ADFuller test to check the stationarity of the time series.
     """
@@ -111,6 +112,6 @@ def perform_cointegration_analysis(logprices: pd.DataFrame, optimal_lag: int) ->
                 return model2, 'Model 2 (restricted constant)'
         elif model_type == 1:
             return model3, 'Model 3 (unrestricted constant)'
-        
+       
 
     
