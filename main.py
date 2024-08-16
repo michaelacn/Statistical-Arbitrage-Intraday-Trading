@@ -4,8 +4,7 @@ import argparse
 import numpy as np
 import pandas as pd
 
-from dashapp import *
-
+from lib.dash_app.dash_app import *
 from lib.models.models import *
 from lib.data.data import *
 from lib.backtest.backtest import *
