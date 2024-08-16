@@ -1,0 +1,21 @@
+# training
+
+csv_file: "us_tnote_intraday_hlocv.csv"
+symbols: ['TYH4 Comdty', 'WNH4 Comdty']
+train_size: 350
+
+# backtest
+
+warmup_period: 350
+entry_factor: 1.96
+sl_factor: 5.88 # 1.96 * 3
+cash: 1_000_000
+comm_pct: 0.00001
+strategy: PairTradingIntraday
+analyzers_config: {
+    OrdersAnalyzer: {'_name': 'orders'},
+    TradesAnalyzer: {'_name': 'trades'}
+}
+freq: 'B'
+
+
