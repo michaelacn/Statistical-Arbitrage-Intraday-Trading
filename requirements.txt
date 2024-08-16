@@ -6,4 +6,4 @@ scipy==1.13.0
 backtrader==1.9.78.123
 dash==2.17.1
 easydict==1.13
-yaml
+pyyaml
