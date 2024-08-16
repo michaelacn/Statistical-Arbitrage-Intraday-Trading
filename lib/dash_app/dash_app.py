@@ -81,7 +81,7 @@ def run_dash_app(args, trades_history, pnl_history, returns, stats, hlocv_data):
         filtered_data = hlocv_data[
             (hlocv_data.index.date == pd.to_datetime(selected_date).date()) &
             (hlocv_data.index.time >= pd.to_datetime('10:00').time()) &
-            (hlocv_data.index.time <= pd.to_datetime('19:00').time())
+            (hlocv_data.index.time <= pd.to_datetime('21:00').time())
         ]
 
         # Separate data for the two assets
@@ -154,4 +154,4 @@ def run_dash_app(args, trades_history, pnl_history, returns, stats, hlocv_data):
         return pnl_fig, cumulative_fig, drawdown_fig
 
     # Run the Dash server
-    app.run_server(debug=False)
+    app.run_server(host='0.0.0.0', debug=False)

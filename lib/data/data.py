@@ -24,7 +24,7 @@ def filter_current_date(data: pd.DataFrame, current_date: str) -> pd.DataFrame:
     """
     data.index = pd.to_datetime(data.index)
     start_datetime = pd.to_datetime(current_date).tz_localize('UTC') + pd.Timedelta(hours=10, minutes=0)
-    end_datetime = pd.to_datetime(current_date).tz_localize('UTC') + pd.Timedelta(hours=19, minutes=0)
+    end_datetime = pd.to_datetime(current_date).tz_localize('UTC') + pd.Timedelta(hours=21, minutes=0)
     return data[(data.index >= start_datetime) & (data.index <= end_datetime)]
 
 

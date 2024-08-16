@@ -215,7 +215,7 @@ class TradesAnalyzer(bt.Analyzer):
                 'entry_date': bt.num2date(trade.dtopen),
                 'size': trade.size,
                 'entry_price': trade.price,
-                'entry_comm': trade.commission  # Store the entry commission
+                'entry_comm': trade.commission
             }
         elif trade.isclosed:
             entry_time = bt.num2date(trade.dtopen)
@@ -241,15 +241,14 @@ class TradesAnalyzer(bt.Analyzer):
             size = trade['size']
             entry_price = trade['entry_price']
             entry_comm = trade['entry_comm']
-            exit_time = self.strategy.datetime.datetime(0)  # Use the last available datetime
-            last_price = self.strategy.getdatabyname(symbol).close[0]  # Get the last closing price
+            exit_time = self.strategy.datetime.datetime(0)
+            last_price = self.strategy.getdatabyname(symbol).close[0] 
 
-            pnl_gross = size * (last_price - entry_price)  # Calculate gross PnL
+            pnl_gross = size * (last_price - entry_price)
             exit_comm = entry_comm  # Assume exit commission is equal to entry commission
-            total_comm = entry_comm + exit_comm  # Total commission
-            pnl_net = pnl_gross - total_comm  # Calculate net PnL
+            total_comm = entry_comm + exit_comm
+            pnl_net = pnl_gross - total_comm 
 
-            # Append the forced close trade details
             self.trades.append({
                 'symbol': symbol,
                 'entry_date': entry_time,
@@ -258,8 +257,8 @@ class TradesAnalyzer(bt.Analyzer):
                 'entry_price': entry_price,
                 'exit_price': last_price,
                 'pnl_gross': pnl_gross,
-                'pnl_net': pnl_net,  # Net PnL after commission
-                'comm': total_comm  # Total commission
+                'pnl_net': pnl_net,
+                'comm': total_comm
             })
 
         trades = pd.DataFrame(self.trades)
