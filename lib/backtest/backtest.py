@@ -151,7 +151,7 @@ class PairTradingIntraday(bt.Strategy):
                 self.log(f'LONG SPREAD: Sell {self.datas[1]._name} ({-size1}) | Buy {self.datas[0]._name} ({size0})', log_type='SIGNAL')
 
         elif self.position_opened and not self.sl_triggered:
-            mean_reverting = np.sign(self.spread_indicator.spread[0]) != np.sign(self.spread_indicator.spread[-1])
+            mean_reverting = self.spread_indicator.spread[0] >= self.p.spread_mean if self.position_opened == 'long_spread' else self.spread_indicator.spread[0] <= self.p.spread_mean
             stop_loss = self.spread_indicator.spread[0] > self.sl_upper or self.spread_indicator.spread[0] < self.sl_lower
             if mean_reverting:
                 self.close(data=self.datas[0], size=abs(position0))
