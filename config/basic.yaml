@@ -1,12 +1,12 @@
 # training
 
 csv_file: "us_tnote_intraday_hlocv.csv"
-symbols: ['TYH4 Comdty', 'WNH4 Comdty']
-train_size: 350
+symbols: ['UXYH4 Comdty', 'WNH4 Comdty']
+train_size: 375
 
 # backtest
 
-warmup_period: 350
+warmup_period: 375
 entry_factor: 1.96
 sl_factor: 5.88 # 1.96 * 3
 cash: 1_000_000
