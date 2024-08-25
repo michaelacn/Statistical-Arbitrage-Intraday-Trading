@@ -41,22 +41,22 @@ Then, the code proceeds through three distinct steps:
 
 # File Structure Information
 
-### main.py
+### `main.py`
 Manages strategy initialization, broker settings, backtesting, and Dash app visualization.
 
-### config/
+### `config/`
 Customize strategy parameters, data paths, and settings via YAML configuration.
 
-### lib/
+### `lib/`
 Contains custom modules for the project, including strategy implementation, data preprocessing, statistical analysis, and Dash app components.
 
-### md_resources/
+### `md_resources/`
 Stores images used in the Markdown documentation to provide visual support and clarity.
 
-### requirements.txt
+### `requirements.txt`
 A file listing all the necessary Python dependencies for the project.
 
-### us_tnote_intraday_hlocv.csv
+### `us_tnote_intraday_hlocv.csv`
 Contains intraday historical data for U.S. Treasury notes futures, covering one quarter.
 
 
